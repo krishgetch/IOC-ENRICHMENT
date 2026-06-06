@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IoC Enrichment & Lookup Dashboard</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Orbitron:wght@600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0b0f14;
+            --panel: #121826;
+            --muted: #9aa4b2;
+            --text: #e6edf3;
+            --primary: #00e5ff;
+            --primary-2: #7c4dff;
+            --accent: #00ffa3;
+            --danger: #ff3b6b;
+            --border: #1f2937;
+            --glow: 0 0 20px rgba(0,229,255,0.35);
+        }
+        * { box-sizing: border-box; }
+		body {
+			font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', 'Liberation Sans', sans-serif;
+            background: radial-gradient(1200px 600px at 10% -10%, rgba(0,229,255,0.08), transparent),
+                        radial-gradient(900px 500px at 110% 10%, rgba(124,77,255,0.08), transparent),
+                        var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+        }
+		h1, h2, h3 { font-family: 'Orbitron', 'Inter', sans-serif; letter-spacing: 1.5px; }
+
+		/* Animated scan grid overlay (subtle) */
+		.header-grid {
+			position: absolute; inset: 0; pointer-events: none; opacity: 0.12;
+			background-image: linear-gradient(transparent 98%, rgba(0,229,255,0.6) 100%), linear-gradient(90deg, transparent 98%, rgba(124,77,255,0.5) 100%);
+			background-size: 24px 24px, 24px 24px;
+			mask-image: radial-gradient(1200px 500px at 60% -20%, black, transparent 70%);
+			animation: drift 20s linear infinite;
+		}
+		@keyframes drift { from { background-position: 0 0, 0 0; } to { background-position: 240px 240px, -240px -240px; } }
+		/* Top navbar */
+		header {
+			background: linear-gradient(180deg, rgba(18,24,38,0.95), rgba(18,24,38,0.75));
+			border-bottom: 1px solid var(--border);
+			color: var(--text);
+			padding: 14px 22px;
+			box-shadow: var(--glow);
+			position: relative;
+			overflow: hidden;
+		}
+		.navbar { display: flex; align-items: center; gap: 18px; max-width: 1200px; margin: 0 auto; }
+		.nav-title { display: flex; align-items: center; gap: 10px; margin-right: 24px; }
+		.nav-title img { height: 36px; filter: drop-shadow(0 0 8px rgba(0,229,255,0.5)); }
+		.nav-title h1 { font-size: 18px; letter-spacing: 2px; margin: 0; color: var(--primary); text-shadow: 0 0 12px rgba(0,229,255,0.35); }
+		.nav-links { display: flex; gap: 8px; flex: 1; }
+		.nav-link { color: var(--muted); text-decoration: none; padding: 8px 12px; border-radius: 8px; transition: background 0.15s ease, color 0.15s ease; }
+		.nav-link:hover { background: #0f1726; color: var(--text); }
+		.nav-link.active { color: var(--text); background: #0f1726; box-shadow: inset 0 0 0 1px #1d2a3e; }
+		.nav-status { display: flex; gap: 10px; align-items: center; }
+		.badge { font-size: 12px; color: #0d1b22; background: var(--accent); padding: 6px 10px; border-radius: 999px; box-shadow: 0 0 12px rgba(0,255,163,0.25); animation: pulse 2.6s ease-in-out infinite; }
+		.badge.secondary { background: var(--primary); box-shadow: 0 0 12px rgba(0,229,255,0.25); animation-delay: 1.3s; }
+		@keyframes pulse { 0%,100% { filter: brightness(1); box-shadow: 0 0 10px rgba(0,255,163,0.18); } 50% { filter: brightness(1.12); box-shadow: 0 0 22px rgba(0,255,163,0.45); } }
+
+        main { padding: 40px 20px; max-width: 980px; margin: auto; }
+        h2 { color: var(--primary); margin-bottom: 14px; text-shadow: 0 0 10px rgba(0,229,255,0.25); }
+
+		/* Cards and panels */
+		.card { background: linear-gradient(180deg, rgba(18,24,38,0.92), rgba(18,24,38,0.88)); padding: 22px; border-radius: 14px; border: 1px solid var(--border); box-shadow: 0 6px 30px rgba(0,0,0,0.35), var(--glow); position: relative; overflow: hidden; }
+		.card::after { content: ""; position: absolute; inset: -150% -150% auto -150%; height: 200%; background: conic-gradient(from 0deg, transparent, rgba(0,229,255,0.05), transparent 30%); animation: sweep 10s linear infinite; }
+		@keyframes sweep { to { transform: rotate(1turn); } }
+		.card:hover { transform: translateY(-1px); transition: transform 120ms ease; }
+		.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin: 22px 0 10px 0; }
+		.stat { background: #101827; border: 1px solid #182133; border-radius: 14px; padding: 18px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02); }
+		.stat-title { font-size: 12px; color: var(--muted); letter-spacing: 1px; }
+		.stat-value { font-size: 28px; font-weight: 700; margin-top: 6px; color: var(--text); }
+
+		form { padding: 0; }
+        label { color: var(--muted); }
+        textarea { width: 100%; height: 170px; background: #0e1421; color: var(--text); border: 1px solid #1f2a3a; border-radius: 10px; padding: 12px 14px; font-size: 14px; resize: vertical; outline: none; transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+        textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(0,229,255,0.15); }
+        .btn-row { display: flex; gap: 12px; flex-wrap: wrap; }
+        button { background: linear-gradient(90deg, var(--primary), var(--primary-2)); color: #061018; border: none; padding: 10px 22px; margin-top: 12px; font-size: 15px; font-weight: 600; border-radius: 10px; cursor: pointer; transition: transform 0.08s ease, filter 0.2s ease, box-shadow 0.2s ease; box-shadow: 0 6px 18px rgba(0,229,255,0.25); }
+        button:hover { filter: brightness(1.05); }
+        button:active { transform: translateY(1px) scale(0.99); }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 28px; background: #0e1421; border: 1px solid var(--border); box-shadow: 0 6px 30px rgba(0,0,0,0.35); border-radius: 12px; overflow: hidden; }
+        th, td { border-bottom: 1px solid #182133; padding: 12px 14px; text-align: left; }
+        th { background: linear-gradient(180deg, #0f1726, #0c1320); color: var(--primary); }
+        tr:nth-child(even) { background: #0b101b; }
+        tr:hover { background: #0f1726; }
+
+        footer { text-align: center; padding: 20px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); margin-top: 40px; }
+        .page-section { display: none; }
+        .page-section.active { display: block; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .placeholder-content { padding: 40px; text-align: center; border: 1px dashed var(--border); border-radius: 14px; color: var(--muted); }
+    </style>
+</head>
+<body>
+    <header>
+		<div class="header-grid"></div>
+        <div class="navbar">
+            <div class="nav-title">
+                <h1>IoC Enrichment & Lookup Dashboard</h1>
+            </div>
+            <nav class="nav-links">
+                <a class="nav-link active" href="#" data-section="dashboard">DASHBOARD</a>
+                <a class="nav-link" href="#" data-section="enrichment">ENRICHMENT</a>
+                <a class="nav-link" href="#" data-section="graph">GRAPH</a>
+                <a class="nav-link" href="#" data-section="upload">UPLOAD</a>
+            </nav>
+            <div class="nav-status">
+                <span class="badge secondary">ONLINE</span>
+                <span class="badge">ACTIVE</span>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <section id="dashboard-section" class="page-section active">
+            <h2>SECURITY DASHBOARD</h2>
+            <div class="stats-grid">
+                <div class="stat"><div class="stat-title">TOTAL INDICATORS</div><div class="stat-value" id="stat-total">0</div></div>
+                <div class="stat"><div class="stat-title">ENRICHED</div><div class="stat-value" id="stat-enriched">0</div></div>
+                <div class="stat"><div class="stat-title">CRITICAL RISKS</div><div class="stat-value" id="stat-critical">0</div></div>
+                <div class="stat"><div class="stat-title">HIGH RISKS</div><div class="stat-value" id="stat-high">0</div></div>
+            </div>
+
+            <div class="card" style="margin-top: 16px;">
+                <h3 style="margin-top:0;color:var(--primary)">Bulk Lookup</h3>
+                <form id="lookup-form">
+                    <label for="inputs">Enter domains, IPs, or SHA1 hashes (one per line):</label><br><br>
+                    <textarea name="inputs" id="inputs" placeholder="example.com&#10;8.8.8.8&#10;d2d2d2..."></textarea><br>
+                    <div class="btn-row">
+                        <button type="submit">Run Lookup</button>
+                        <a id="download" href="/download"><button type="button">Download CSV</button></a>
+                    </div>
+                </form>
+            </div>
+
+            <div class="card" style="margin-top: 16px;">
+                <h3 style="margin-top:0;color:var(--primary)">Recent Activity</h3>
+                <div id="results"></div>
+            </div>
+        </section>
+
+        <section id="enrichment-section" class="page-section">
+            <h2>ENRICHMENT ENGINE</h2>
+            <div class="card">
+                <div id="enrichment-content">
+                    <p style="color:var(--muted)">Run a lookup in the Dashboard to see enriched data here.</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="graph-section" class="page-section">
+            <h2>THREAT GRAPH</h2>
+            <div class="card">
+                <div style="height: 400px; display: flex; align-items: center; justify-content: center; background: #0e1421; border-radius: 10px; border: 1px solid var(--border);">
+                    <div id="graph-container" style="text-align: center;">
+                        <p style="color:var(--muted)">Threat relationship visualization will appear here after lookup.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="upload-section" class="page-section">
+            <h2>INDICATOR UPLOAD</h2>
+            <div class="card">
+                <div class="placeholder-content">
+                    <p>Select a text or CSV file containing domains/IPs/Hashes.</p>
+                    <input type="file" id="file-input" style="display: none;" accept=".txt,.csv">
+                    <button id="select-file-btn">Select File</button>
+                    <p id="file-name" style="margin-top: 10px; color: var(--primary); font-size: 14px;"></p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        &copy; 2025 Cybersecurity Lookup Tool. All rights reserved.
+    </footer>
+
+    <script>
+        // Section Switching Logic
+        const navLinks = document.querySelectorAll('.nav-link')
+        const sections = document.querySelectorAll('.page-section')
+
+        navLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault()
+                const target = link.getAttribute('data-section')
+                
+                // Update active link
+                navLinks.forEach(l => l.classList.remove('active'))
+                link.classList.add('active')
+
+                // Show target section
+                sections.forEach(s => {
+                    s.classList.remove('active')
+                    if (s.id === `${target}-section`) {
+                        s.classList.add('active')
+                    }
+                })
+            })
+        })
+
+        // Lookup and Stats Logic
+        const form = document.getElementById('lookup-form')
+        const resultsEl = document.getElementById('results')
+        
+        const statTotal = document.getElementById('stat-total')
+        const statEnriched = document.getElementById('stat-enriched')
+        const statCritical = document.getElementById('stat-critical')
+        const statHigh = document.getElementById('stat-high')
+
+        const enrichmentContent = document.getElementById('enrichment-content')
+        const graphContainer = document.getElementById('graph-container')
+        
+        // Upload Logic
+        const fileInput = document.getElementById('file-input')
+        const selectFileBtn = document.getElementById('select-file-btn')
+        const fileNameDisplay = document.getElementById('file-name')
+        const textareaInputs = document.getElementById('inputs')
+
+        selectFileBtn.addEventListener('click', () => fileInput.click())
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0]
+            if (file) {
+                fileNameDisplay.textContent = `Selected: ${file.name}`
+                const reader = new FileReader()
+                reader.onload = (event) => {
+                    textareaInputs.value = event.target.result
+                    // Switch to dashboard to show the imported data
+                    document.querySelector('[data-section="dashboard"]').click()
+                }
+                reader.readAsText(file)
+            }
+        })
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault()
+            const inputs = document.getElementById('inputs').value
+			resultsEl.innerHTML = '<p>Running lookup…</p>'
+            try {
+                const res = await fetch('/api/lookup', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ inputs })
+                })
+                const data = await res.json()
+                const rows = data.results || []
+                
+                // Update Dashboard Stats
+                let total = rows.length
+                let enriched = 0
+                let critical = 0
+                let high = 0
+
+                rows.forEach(r => {
+                    if (r.detection_ratio !== 'N/A' || r.abuse_score !== 'N/A') {
+                        enriched++
+                    }
+                    
+                    const malVT = parseInt(r.detection_ratio?.split(' / ')[0]) || 0
+                    const abuseScore = parseInt(r.abuse_score) || 0
+
+                    if (malVT > 10 || abuseScore > 75) {
+                        critical++
+                    } else if (malVT > 0 || abuseScore > 20) {
+                        high++
+                    }
+                })
+
+                statTotal.textContent = total
+                statEnriched.textContent = enriched
+                statCritical.textContent = critical
+                statHigh.textContent = high
+
+                // Update Enrichment and Graph sections with data
+                if (rows.length > 0) {
+                    // Enrichment View
+                    enrichmentContent.innerHTML = '<h3>Enriched Metadata</h3>'
+                    const eTable = document.createElement('table')
+                    eTable.innerHTML = `<thead><tr><th>Input</th><th>Abuse Domain</th><th>Usage Type</th><th>Country</th></tr></thead>`
+                    const eBody = document.createElement('tbody')
+                    rows.forEach(r => {
+                        const tr = document.createElement('tr')
+                        tr.innerHTML = `<td>${r.input}</td><td>${r.abuse_domain}</td><td>${r.usage_type}</td><td>${r.country_code}</td>`
+                        eBody.appendChild(tr)
+                    })
+                    eTable.appendChild(eBody)
+                    enrichmentContent.appendChild(eTable)
+
+                    // Graph View (Visual Placeholder)
+                    graphContainer.innerHTML = `
+                        <div style="display:inline-block; padding:20px; border:2px solid var(--primary); border-radius:50%; margin-bottom:20px; box-shadow:var(--glow)">
+                            <span style="color:var(--primary); font-weight:bold;">${rows.length} Nodes</span>
+                        </div>
+                        <p style="color:var(--text)">Total connections mapped: ${rows.length}</p>
+                        <p style="color:var(--muted); font-size:12px;">Visualizing relationships between ${total} indicators...</p>
+                    `
+                }
+
+                if (!rows.length) {
+					resultsEl.innerHTML = '<p>No results.</p>'
+                    return
+                }
+                const header = ['Input','Detection Ratio','Registration Date','Abuse Score','Domain','Country Code','Usage Type']
+                const table = document.createElement('table')
+                const thead = document.createElement('thead')
+                const trh = document.createElement('tr')
+                header.forEach(h => { const th = document.createElement('th'); th.textContent = h; trh.appendChild(th) })
+                thead.appendChild(trh)
+                const tbody = document.createElement('tbody')
+                rows.forEach(r => {
+                  const tr = document.createElement('tr')
+                  
+                  // Input cell
+                  const tdInput = document.createElement('td')
+                  tdInput.textContent = r.input ?? 'N/A'
+                  tr.appendChild(tdInput)
+
+                  // Detection Ratio with link and color
+                  const tdRatio = document.createElement('td')
+                  const ratioLink = document.createElement('a')
+                  ratioLink.href = r.vt_link || '#'
+                  ratioLink.target = '_blank'
+                  ratioLink.textContent = r.detection_ratio ?? 'N/A'
+                  ratioLink.style.color = r.malicious > 0 ? 'var(--danger)' : 'var(--accent)'
+                  ratioLink.style.fontWeight = 'bold'
+                  ratioLink.style.textDecoration = 'none'
+                  tdRatio.appendChild(ratioLink)
+                  tr.appendChild(tdRatio)
+
+                  // Remaining cells
+				  const remaining = [
+					  r.registration_date ?? 'N/A',
+					  r.abuse_score ?? 'N/A',
+					  r.abuse_domain ?? 'N/A',
+					  r.country_code ?? 'N/A',
+					  r.usage_type ?? 'N/A'
+				  ]
+                  remaining.forEach(c => { const td = document.createElement('td'); td.textContent = c; tr.appendChild(td) })
+                  tbody.appendChild(tr)
+                })
+                table.appendChild(thead)
+                table.appendChild(tbody)
+                resultsEl.innerHTML = ''
+				const hint = document.createElement('p')
+				hint.style.color = 'var(--muted)'
+				hint.style.marginTop = '8px'
+				hint.textContent = 'If you see N/A values, the provider may have no data or the API key is rate limited.'
+				resultsEl.appendChild(table)
+				resultsEl.appendChild(hint)
+            } catch (err) {
+                resultsEl.innerHTML = '<p>Lookup failed.</p>'
+            }
+        })
+    </script>
+</body>
+</html>
+
+
